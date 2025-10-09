@@ -1,0 +1,134 @@
+🚀 Hướng Dẫn Cài Đặt Kubernetes Trên Ubuntu (Kubeadm)
+🧩 1. Cấu hình ban đầu
+Cập nhật hệ thống
+sudo apt update && sudo apt upgrade -y
+
+Tắt swap
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+Bật các module cần thiết
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+Kiểm tra module
+lsmod | grep br_netfilter
+
+
+Nếu có:
+
+br_netfilter           28672  0
+bridge                282624  1 br_netfilter
+
+
+→ OK ✅
+
+Cấu hình sysctl cho networking
+cat <<EOF | sudo tee /etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+
+sudo sysctl --system
+
+🐳 2. Cài đặt container runtime (containerd)
+sudo apt install -y containerd
+
+
+Tạo file cấu hình:
+
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+
+
+Chỉnh sửa trong /etc/containerd/config.toml:
+
+Tìm dòng:
+
+SystemdCgroup = false
+
+
+→ Sửa thành:
+
+SystemdCgroup = true
+
+
+Khởi động lại dịch vụ:
+
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+☸️ 3. Cài đặt Kubernetes (kubeadm, kubelet, kubectl)
+sudo apt-get install -y apt-transport-https ca-certificates curl
+sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt update
+sudo apt install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+🧠 4. Khởi tạo cluster (trên master node)
+Kiểm tra IP LAN:
+ip a | grep inet
+
+
+→ Ví dụ: 192.168.5.14
+
+Khởi tạo cluster:
+sudo kubeadm init --apiserver-advertise-address=192.168.5.14 --pod-network-cidr=192.168.0.0/16
+
+
+🧩 --apiserver-advertise-address là IP LAN thật của node (dùng để các node khác kết nối vào).
+
+Sau khi init xong:
+
+Chạy các lệnh cấu hình cho kubectl:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+🌐 5. Cài đặt mạng Pod (Calico)
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+
+🧩 6. Kiểm tra trạng thái
+kubectl get nodes
+kubectl get pods -n kube-system
+
+
+✅ Nếu node Ready → cluster đã sẵn sàng.
+
+🧯 7. Lỗi hay gặp & Cách khắc phục
+Lỗi	Nguyên nhân	Cách fix
+br_netfilter missing	Module chưa bật	sudo modprobe br_netfilter
+Node NotReady	Calico chưa chạy hoặc mạng chưa setup	Cài lại Calico, kiểm tra kubectl get pods -n kube-system
+Init:CreateContainerError (Calico)	Mount propagation của root là private	sudo mount --make-shared / rồi kubectl delete pod -n kube-system -l k8s-app=calico-node
+Connection refused khi SSH	SSH service chưa chạy hoặc firewall chặn	sudo systemctl enable --now ssh, kiểm tra ufw
+Swap is on khi init	Chưa tắt swap	sudo swapoff -a và sửa /etc/fstab
+systemd cgroup driver mismatch	containerd không dùng systemd	Sửa SystemdCgroup = true trong /etc/containerd/config.toml
+🧩 8. Thêm worker node
+
+Trên node worker, cài đặt giống master (đến bước cài kubeadm/kubelet/kubectl).
+
+Sau đó trên master chạy:
+
+kubeadm token create --print-join-command
+
+
+→ Copy lệnh join đó, chạy trên node worker.
+
+✅ 9. Kiểm tra toàn cluster
+kubectl get nodes
+kubectl get pods -A
+
+
+Tất cả STATUS = Running → OK 🎉
+
+📘 10. Một số lệnh hữu ích
+Lệnh	Mục đích
+kubectl get nodes	Xem các node trong cluster
+kubectl get pods -A	Xem toàn bộ pod
+kubectl describe pod <tên>	Chi tiết pod
+kubectl logs <pod>	Xem log pod
+sudo crictl ps -a	Liệt kê container runtime
+sudo crictl logs <containerID>	Xem log container thực tế

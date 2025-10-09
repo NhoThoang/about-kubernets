@@ -1,0 +1,5 @@
+| Tình huống              | Lệnh xử lý                                  |
+| ----------------------- | ------------------------------------------- |
+| Muốn in lại lệnh join   | `kubeadm token create --print-join-command` |
+| Token hết hạn           | `kubeadm token create` + `openssl x509 ...` |
+| Xem token còn hạn không | `kubeadm token list`                        |

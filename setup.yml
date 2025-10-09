@@ -1,0 +1,166 @@
+🧱 Tổng quan setup
+Vai trò	Hostname	IP (ví dụ)
+Master	k8s-master	192.168.0.100
+Worker1	k8s-node1	192.168.0.101
+Worker2	k8s-node2	192.168.0.102
+
+👉 Cả 3 máy đều là Ubuntu Server 22.04/24.04 (đề xuất).
+
+🧰 1️⃣ Chuẩn bị môi trường trên cả 3 node
+1. Cập nhật hệ thống
+sudo apt update && sudo apt upgrade -y
+
+2. Tắt swap (bắt buộc cho K8s)
+sudo swapoff -a
+sudo sed -i '/swap/d' /etc/fstab
+
+3. Cài container runtime (containerd)
+sudo apt install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+4. Bật các module kernel cần thiết
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+5. Cấu hình sysctl cho K8s
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.ipv4.ip_forward                 = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+EOF
+
+sudo sysctl --system
+
+🧩 2️⃣ Cài đặt K8s tools: kubeadm, kubelet, kubectl
+
+Trên tất cả các node (master + worker):
+
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
+sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] \
+https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" | \
+sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+
+Kiểm tra:
+
+kubeadm version
+
+🚀 3️⃣ Khởi tạo cluster trên Master
+
+Trên master node (192.168.0.100):
+
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16
+
+
+⚠️ Tham số --pod-network-cidr cần khớp với plugin mạng (Calico dùng 192.168.0.0/16, Flannel dùng 10.244.0.0/16).
+
+Nếu thành công, bạn sẽ thấy output kiểu như:
+
+Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+  kubeadm join 192.168.0.100:6443 --token abcdef.0123456789abcdef \
+    --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxx
+
+
+Chạy đúng 3 dòng đầu:
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+🌐 4️⃣ Cài đặt mạng cho pod (CNI Plugin)
+
+Cài Calico (rất phổ biến, ổn định):
+
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.2/manifests/calico.yaml
+
+
+Kiểm tra:
+
+kubectl get pods -n kube-system
+
+
+Khi tất cả đều Running → OK ✅
+
+🤝 5️⃣ Thêm worker node vào cluster
+
+Trên mỗi worker node, chạy lệnh join mà master đã in ra, ví dụ:
+
+sudo kubeadm join 192.168.0.100:6443 --token abcdef.0123456789abcdef \
+    --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxx
+
+
+Nếu bạn quên token, có thể tạo lại trên master:
+
+kubeadm token create --print-join-command
+
+🔍 6️⃣ Kiểm tra cluster từ master
+
+Trên master:
+
+kubectl get nodes
+
+
+Kết quả mong đợi:
+
+NAME           STATUS   ROLES           AGE     VERSION
+k8s-master     Ready    control-plane   10m     v1.30.x
+k8s-node1      Ready    <none>          5m      v1.30.x
+k8s-node2      Ready    <none>          5m      v1.30.x
+
+⚡ 7️⃣ Test nhanh
+
+Chạy 1 deployment thử:
+
+kubectl create deployment nginx --image=nginx
+kubectl expose deployment nginx --port=80 --type=NodePort
+kubectl get svc
+
+
+Truy cập bằng trình duyệt:
+http://<IP_node_worker>:<nodePort>
+
+🔧 8️⃣ (Tuỳ chọn) – Nếu muốn reset lại cluster
+
+Trên tất cả node:
+
+sudo kubeadm reset -f
+sudo rm -rf ~/.kube
+sudo systemctl restart containerd
+
+✅ Tóm tắt nhanh
+Bước	Làm gì	Trên node
+1	Cài containerd + tắt swap	Master + Worker
+2	Cài kubeadm/kubectl/kubelet	Master + Worker
+3	kubeadm init	Master
+4	apply Calico	Master
+5	kubeadm join	Worker
+6	Kiểm tra kubectl get nodes	Master
+
+Nếu bạn muốn, mình có thể viết script auto setup 3 node (master + 2 worker) chỉ cần chạy 1 lệnh copy-paste (giúp tiết kiệm thời gian test) — bạn muốn mình tạo luôn không?

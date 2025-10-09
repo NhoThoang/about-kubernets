@@ -1,0 +1,140 @@
+🧩 1. Kiến trúc tổng quan K8s
+
+Một cluster Kubernetes chia thành hai loại node:
+
+Master node (Control Plane): chịu trách nhiệm quản lý, điều phối (như bộ não).
+Thành phần chính:
+
+kube-apiserver: gateway trung tâm, tất cả request đều đi qua đây.
+
+etcd: database lưu toàn bộ trạng thái cluster.
+
+kube-controller-manager: giám sát trạng thái và điều phối.
+
+kube-scheduler: chọn node phù hợp để chạy pod.
+
+Worker node (Data Plane): nơi thực thi container thực tế (ứng dụng, service...).
+Thành phần:
+
+kubelet: agent nói chuyện với apiserver.
+
+kube-proxy: quản lý network routing giữa các pod và service.
+
+container runtime: Docker, containerd...
+
+⚙️ 2. Thực tế triển khai — Bao nhiêu Master/Worker Node?
+💼 Production (môi trường thật):
+
+Tối thiểu 3 master node → để đảm bảo HA (High Availability) cho etcd và control plane.
+Thường chạy ở các AZ (Availability Zone) khác nhau nếu là cloud.
+
+Worker node: tuỳ quy mô.
+
+Nhỏ (startup): 3–5 node
+
+Trung bình: 10–50 node
+
+Lớn (tập đoàn): hàng trăm node, mỗi node có thể 64–128 CPU.
+
+👉 Tổng quan thực tế:
+
+Môi trường	Master node	Worker node	Ghi chú
+Dev / Test	1	1–3	Dễ setup, không HA
+Staging	3	3–10	Kiểm thử, gần giống production
+Production nhỏ	3	5–20	Đảm bảo HA
+Production lớn	5+	50–500+	Multi-zone, autoscale
+🌐 3. Mạng trong Kubernetes (Networking Model)
+
+K8s có 4 lớp mạng chính:
+
+Pod-to-Pod:
+
+Mỗi pod có một IP riêng (không NAT).
+
+Các pod có thể nói chuyện trực tiếp với nhau trên toàn cluster.
+
+Cung cấp bởi plugin như:
+
+Calico (Layer 3 routing)
+
+Flannel (overlay VXLAN)
+
+Cilium (eBPF-based)
+
+Pod-to-Service:
+
+Service có ClusterIP → load balance nội bộ cho pod.
+
+kube-proxy tạo rule để định tuyến lưu lượng đến đúng pod.
+
+External Access (Ingress):
+
+Dùng Ingress Controller (Nginx, Traefik, Istio, Kong...) để nhận traffic từ ngoài (HTTP, HTTPS).
+
+Có thể dùng LoadBalancer nếu chạy trên cloud.
+
+Node-to-Node Communication:
+
+Các node worker thường nằm trong cùng subnet (VD: 10.244.0.0/16)
+
+Mỗi CNI plugin định nghĩa cách route giữa các node.
+
+VD với Flannel: dùng VXLAN tunnel (gói dữ liệu đóng trong UDP).
+
+Với Calico: dùng BGP routing để route trực tiếp giữa node.
+
+🔁 4. Giao tiếp giữa Master và Worker
+👉 Worker → Master:
+
+kubelet trên worker sẽ đăng ký node với apiserver qua HTTPS (port 6443).
+
+Gửi heartbeat định kỳ, báo tình trạng node/pod.
+
+Lấy lệnh từ control plane (khi cần deploy/update pod).
+
+👉 Master → Worker:
+
+Không truy cập trực tiếp.
+
+apiserver gửi lệnh qua pull model → kubelet nhận lệnh.
+
+controller-manager và scheduler ra quyết định, sau đó apiserver phân phối.
+
+Tất cả đều đi qua API Server (trung tâm giao tiếp).
+
+🧠 5. Ví dụ thực tế (mô hình phổ biến):
+                +---------------------------+
+                |     Control Plane (HA)    |
+                |---------------------------|
+                | Master1 | Master2 | Master3|
+                +---------------------------+
+                         |
+                         | HTTPS (port 6443)
+                         v
+        +--------------------------------------------+
+        |             Worker Nodes                   |
+        |--------------------------------------------|
+        | Node1 | Node2 | Node3 | Node4 | Node5 | ...|
+        +--------------------------------------------+
+          |        |         |          |
+         Pods     Pods      Pods       Pods
+          |        |         |          |
+        Overlay Network (Flannel/Calico/Cilium)
+
+🔒 6. Bảo mật & TLS
+
+Tất cả giao tiếp giữa master ↔ worker đều dùng TLS.
+
+kubeadm sinh chứng chỉ SSL tự động.
+
+RBAC (Role-Based Access Control) kiểm soát quyền truy cập API.
+
+🧰 7. Triển khai thực tế
+
+Trên cloud (EKS, GKE, AKS): cloud quản lý phần control plane (master).
+→ DevOps chỉ quản lý worker node.
+
+Trên on-premise (bare-metal, VM): dùng kubeadm, k3s, RKE, MicroK8s...
+→ Bạn phải tự quản lý HA, networking, storage.
+
+Nếu bạn muốn, mình có thể vẽ sơ đồ cụ thể (mạng, control plane, service, ingress) hoặc ví dụ cấu hình thật (Calico + 3 master + 4 worker) để bạn thấy luồng gói tin đi như nào — bạn muốn mình làm phần đó không?
