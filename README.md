@@ -196,6 +196,73 @@ kubectl port-forward <pod-name> 8080:80
 
 ---
 
+## Tham khảo: lệnh `get` / `describe` (chi tiết)
+
+| **Resource**                         | **Lệnh xem nhanh (`get`)**                                                            | **Lệnh chi tiết (`describe`)**              | **Ghi chú**                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| **Pod**                              | `kubectl get pods`  
+`kubectl get pods -n <namespace>`  
+`kubectl get pods -o wide` | `kubectl describe pod <pod-name>`           | Hiển thị trạng thái, node, container, events              |
+| **Node**                             | `kubectl get nodes`                                                                   | `kubectl describe node <node-name>`         | Kiểm tra node Ready, role, CPU/memory, taints             |
+| **Service**                          | `kubectl get services`  
+`kubectl get svc -n <namespace>`                            | `kubectl describe svc <service-name>`       | Xem type: ClusterIP, NodePort, LoadBalancer, ExternalName |
+| **Deployment**                       | `kubectl get deployments`  
+`kubectl get deploy -n <namespace>`                      | `kubectl describe deploy <deployment-name>` | Xem số replica, strategy, pods liên kết                   |
+| **StatefulSet**                      | `kubectl get statefulsets`                                                            | `kubectl describe statefulset <name>`       | Pods có tên cố định, persistent volume                    |
+| **ReplicaSet**                       | `kubectl get replicasets`                                                             | `kubectl describe replicaset <name>`        | Đảm bảo số lượng pod chạy                                 |
+| **DaemonSet**                        | `kubectl get daemonsets`                                                              | `kubectl describe daemonset <name>`         | Chạy pod trên mọi node hoặc node chọn lọc                 |
+| **Job**                              | `kubectl get jobs`                                                                    | `kubectl describe job <job-name>`           | Chạy pod một lần                                          |
+| **CronJob**                          | `kubectl get cronjobs`                                                                | `kubectl describe cronjob <name>`           | Chạy job theo lịch định sẵn                               |
+| **ConfigMap**                        | `kubectl get configmaps`                                                              | `kubectl describe configmap <name>`         | Lưu config không nhạy cảm                                 |
+| **Secret**                           | `kubectl get secrets`                                                                 | `kubectl describe secret <name>`            | Lưu thông tin nhạy cảm                                    |
+| **PersistentVolume (PV)**            | `kubectl get pv`                                                                      | `kubectl describe pv <name>`                | Kiểm tra storage trong cluster                            |
+| **PersistentVolumeClaim (PVC)**      | `kubectl get pvc`                                                                     | `kubectl describe pvc <name>`               | Xem yêu cầu storage từ pod                                |
+| **Ingress**                          | `kubectl get ingress`                                                                 | `kubectl describe ingress <name>`           | Xem rule định tuyến HTTP/HTTPS                            |
+| **Namespace**                        | `kubectl get namespaces`                                                              | `kubectl describe namespace <name>`         | Quản lý môi trường, resource quota                        |
+| **NetworkPolicy**                    | `kubectl get networkpolicies`                                                         | `kubectl describe networkpolicy <name>`     | Kiểm soát traffic giữa pod                                |
+| **Role / ClusterRole**               | `kubectl get roles` / `kubectl get clusterroles`                                      | `kubectl describe role <name>`              | Quyền truy cập trong cluster                              |
+| **RoleBinding / ClusterRoleBinding** | `kubectl get rolebindings` / `kubectl get clusterrolebindings`                        | `kubectl describe rolebinding <name>`       | Gán quyền cho user/serviceaccount                         |
+| **CustomResourceDefinition (CRD)**   | `kubectl get crds`                                                                    | `kubectl describe crd <name>`               | Resource tùy chỉnh do operator tạo                        |
+
+
+💡 Tips bổ sung:
+
+- Dùng `-o yaml` hoặc `-o json` để xem cấu hình chi tiết (có thể copy/paste, debug):
+
+```bash
+kubectl get pod <pod-name> -o yaml
+kubectl get svc <service-name> -o yaml
+```
+
+- Dùng `-w` để watch (theo dõi thay đổi tự động):
+
+```bash
+kubectl get pods -w
+kubectl get services -w
+```
+
+- Bạn có thể kết hợp `-n <namespace>` với bất kỳ lệnh nào để giới hạn trong namespace cụ thể:
+
+```bash
+kubectl get pods -n my-namespace
+kubectl describe deploy my-deploy -n my-namespace
+```
+
+- Một số lệnh hữu ích khác:
+
+```bash
+# Xem logs theo real-time
+kubectl logs -f <pod-name> [-c <container>]
+
+# Lấy events (có thể filter theo namespace)
+kubectl get events -n <namespace> --sort-by='.metadata.creationTimestamp'
+
+# Lấy resource dưới định dạng JSONPath hoặc custom-columns để trích xuất thông tin nhanh
+kubectl get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase
+```
+
+---
+
 ## Kết luận
 
 Kubernetes là nền tảng tiêu chuẩn cho các kiến trúc Cloud Native: nó cho phép bạn mô tả mọi resource bằng YAML, tự động hóa triển khai, mở rộng và quản lý mạng/lưu trữ/quyền hạn. Với các CNI plugins và hệ sinh thái rộng lớn, Kubernetes phù hợp cho cả môi trường on-premise và cloud.
