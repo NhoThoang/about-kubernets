@@ -1,0 +1,222 @@
+Giới thiệu Kubernetes (K8s)
+
+Kubernetes (K8s) là một hệ thống quản lý container mã nguồn mở do Google phát triển, hiện nay được Cloud Native Computing Foundation (CNCF) duy trì. Kubernetes giúp triển khai, quản lý, mở rộng và vận hành ứng dụng container một cách tự động.
+
+Ngôn ngữ viết: Go (Golang)
+
+Container runtime: Kubernetes thường sử dụng containerd (hoặc các runtime khác như CRI-O, Docker) để chạy các container.
+
+1. Kiến trúc cơ bản
+
+Kubernetes có kiến trúc Master-Worker:
+
+a. Node
+
+Control-plane node (Master node):
+
+Chịu trách nhiệm quản lý cluster, quyết định scheduler, maintain trạng thái cluster.
+
+Chạy các pod hệ thống như:
+
+kube-apiserver
+
+kube-controller-manager
+
+kube-scheduler
+
+etcd (lưu trạng thái cluster)
+
+Worker node:
+
+Chạy workloads (pod ứng dụng).
+
+Chạy các pod system hỗ trợ như kube-proxy, coredns, calico-node (CNI).
+
+Bạn có thể xem trạng thái các node bằng lệnh:
+
+kubectl get nodes
+
+
+Output ví dụ:
+
+NAME       STATUS   ROLES           AGE     VERSION
+ubuntu3    Ready    control-plane   6m44s   v1.31.13
+ubuntu22   Ready    <none>          4m27s   v1.32.9
+
+b. Pod
+
+Pod là đơn vị triển khai cơ bản trong Kubernetes, chứa một hoặc nhiều container chạy cùng namespace mạng, volume, config.
+
+Các loại pod phổ biến:
+
+Application pod: chứa container ứng dụng của bạn
+
+System pod: pod phục vụ cluster, ví dụ coredns, kube-proxy, calico-node
+
+Xem pod đang chạy:
+
+kubectl get pods -n kube-system
+
+
+Output ví dụ:
+
+NAME                                       READY   STATUS    AGE
+calico-node-xxrhd                          1/1     Running   5m
+coredns-7c65d6cfc9-vk8m6                   1/1     Running   6m
+
+c. Service
+
+Service giúp kết nối các pod với nhau và với bên ngoài cluster.
+
+Ví dụ: ClusterIP, NodePort, LoadBalancer.
+
+d. Networking
+
+Kubernetes tạo một mạng riêng cho pod:
+
+Mỗi pod có IP riêng, có thể giao tiếp trực tiếp với pod khác trong cluster (giống LAN).
+
+Các layer network:
+
+Layer 3: IP routing giữa pod và node
+
+Layer 7: Service, Ingress để định tuyến HTTP/HTTPS, giống như reverse proxy
+
+Control-plane node giống như router / switch điều phối traffic và quyết định pod chạy ở node nào.
+
+Các mạng trong K8s thường triển khai qua CNI plugins như Calico, Flannel, Weave.
+
+e. Cấu hình & triển khai
+
+Kubernetes dùng file YAML để mô tả cấu hình:
+
+Pod, Deployment, Service, ConfigMap, Ingress...
+
+Ví dụ triển khai một pod:
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+
+
+Áp dụng bằng lệnh:
+
+kubectl apply -f pod.yaml
+
+f. Tổng quan hoạt động
+
+Người dùng viết file YAML → apply lên cluster
+
+kube-apiserver nhận request → lưu vào etcd
+
+scheduler quyết định pod chạy trên node nào
+
+Node thực thi container qua containerd
+
+Service và Ingress định tuyến traffic giữa pod hoặc ra ngoài
+
+💡 Tóm tắt:
+
+Kubernetes là hệ thống quản lý container, dùng container runtime (containerd, Docker).
+
+Kiến trúc: Control-plane + Worker node
+
+Thành phần chính: Pod, Service, Deployment, ConfigMap, Ingress
+
+Mạng pod riêng biệt, layer3 routing, layer7 service/ingress.
+
+Cấu hình bằng YAML.
+
+
+
+1. Workload resources (liên quan đến chạy ứng dụng)
+
+ReplicaSet: đảm bảo số lượng pod chạy theo mong muốn
+
+StatefulSet: chạy pod có state (dữ liệu lưu persistent, tên pod cố định)
+
+DaemonSet: chạy một pod trên mọi node hoặc các node theo label selector
+
+Job: chạy pod một lần, hoàn thành là kết thúc
+
+CronJob: chạy pod theo lịch định sẵn (giống cron)
+
+ReplicationController: tương tự ReplicaSet (ít dùng hiện nay)
+
+2. Configuration & Storage
+
+Secret: lưu thông tin nhạy cảm (password, token, key)
+
+PersistentVolume (PV): định nghĩa storage trên cluster
+
+PersistentVolumeClaim (PVC): yêu cầu storage từ PV
+
+StorageClass: chính sách cấp phát storage động
+
+3. Networking & Exposure
+
+Ingress: định tuyến HTTP/HTTPS từ ngoài vào cluster
+
+NetworkPolicy: quy định luồng traffic giữa pod
+
+Service: ClusterIP, NodePort, LoadBalancer, ExternalName
+
+4. Cluster-level / Meta
+
+Namespace: chia cluster thành nhiều môi trường/nhóm
+
+ResourceQuota: giới hạn tài nguyên cho namespace
+
+LimitRange: giới hạn resource cho pod/container
+
+Role / ClusterRole & RoleBinding / ClusterRoleBinding: quản lý quyền truy cập
+
+ServiceAccount: tài khoản pod dùng để tương tác với API
+
+5. Custom Resource
+
+CustomResourceDefinition (CRD): cho phép tạo resource riêng ngoài các resource mặc định của K8s
+
+Ví dụ: Prometheus, ArgoCD, hoặc các operator khác sẽ định nghĩa CRD.
+
+
+| **Resource**                         | **Chức năng**                                      | **Ví dụ YAML ngắn**                                                                                                                                                                                                                                                             |
+| ------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pod**                              | Đơn vị chạy container cơ bản                       | `yaml apiVersion: v1 kind: Pod metadata: name: nginx-pod spec: containers: - name: nginx image: nginx:latest`                                                                                                                                                                   |
+| **Deployment**                       | Quản lý nhiều replica pod, auto update             | `yaml apiVersion: apps/v1 kind: Deployment metadata: name: nginx-deploy spec: replicas: 2 selector: matchLabels: app: nginx template: metadata: labels: app: nginx spec: containers: - name: nginx image: nginx:latest`                                                         |
+| **ReplicaSet**                       | Đảm bảo số lượng pod chạy theo mong muốn           | `yaml apiVersion: apps/v1 kind: ReplicaSet metadata: name: nginx-rs spec: replicas: 3 selector: matchLabels: app: nginx template: metadata: labels: app: nginx spec: containers: - name: nginx image: nginx:latest`                                                             |
+| **StatefulSet**                      | Pod có state, tên cố định, dùng storage persistent | `yaml apiVersion: apps/v1 kind: StatefulSet metadata: name: mysql spec: serviceName: "mysql" replicas: 1 selector: matchLabels: app: mysql template: metadata: labels: app: mysql spec: containers: - name: mysql image: mysql:8`                                               |
+| **DaemonSet**                        | Chạy pod trên mọi node hoặc node chọn lọc          | `yaml apiVersion: apps/v1 kind: DaemonSet metadata: name: calico spec: selector: matchLabels: app: calico template: metadata: labels: app: calico spec: containers: - name: calico-node image: calico/node`                                                                     |
+| **Job**                              | Chạy pod 1 lần                                     | `yaml apiVersion: batch/v1 kind: Job metadata: name: backup spec: template: spec: containers: - name: backup image: busybox command: ["echo", "backup"] restartPolicy: Never`                                                                                                   |
+| **CronJob**                          | Chạy job theo lịch                                 | `yaml apiVersion: batch/v1 kind: CronJob metadata: name: hello spec: schedule: "*/1 * * * *" jobTemplate: spec: template: spec: containers: - name: hello image: busybox command: ["echo","Hello"] restartPolicy: OnFailure`                                                    |
+| **Service**                          | Kết nối pod, expose ra ngoài                       | `yaml apiVersion: v1 kind: Service metadata: name: nginx-svc spec: selector: app: nginx ports: - port: 80 targetPort: 80 type: ClusterIP`                                                                                                                                       |
+| **Ingress**                          | Định tuyến HTTP/HTTPS                              | `yaml apiVersion: networking.k8s.io/v1 kind: Ingress metadata: name: web-ingress spec: rules: - host: example.com http: paths: - path: / backend: service: name: nginx-svc port: number: 80`                                                                                    |
+| **ConfigMap**                        | Lưu config không nhạy cảm                          | `yaml apiVersion: v1 kind: ConfigMap metadata: name: app-config data: key1: value1 key2: value2`                                                                                                                                                                                |
+| **Secret**                           | Lưu dữ liệu nhạy cảm                               | `yaml apiVersion: v1 kind: Secret metadata: name: db-secret type: Opaque data: password: cGFzc3dvcmQ=`                                                                                                                                                                          |
+| **PersistentVolume (PV)**            | Định nghĩa storage                                 | `yaml apiVersion: v1 kind: PersistentVolume metadata: name: pv-data spec: capacity: storage: 1Gi accessModes: [ReadWriteOnce] hostPath: path: /data`                                                                                                                            |
+| **PersistentVolumeClaim (PVC)**      | Yêu cầu storage từ PV                              | `yaml apiVersion: v1 kind: PersistentVolumeClaim metadata: name: pvc-data spec: accessModes: [ReadWriteOnce] resources: requests: storage: 1Gi`                                                                                                                                 |
+| **Namespace**                        | Chia cluster theo môi trường hoặc nhóm             | `yaml apiVersion: v1 kind: Namespace metadata: name: dev`                                                                                                                                                                                                                       |
+| **NetworkPolicy**                    | Quy định luồng traffic giữa pod                    | `yaml apiVersion: networking.k8s.io/v1 kind: NetworkPolicy metadata: name: allow-nginx spec: podSelector: matchLabels: app: nginx policyTypes: - Ingress`                                                                                                                       |
+| **Role / ClusterRole**               | Quyền truy cập trong cluster                       | `yaml apiVersion: rbac.authorization.k8s.io/v1 kind: Role metadata: name: pod-reader rules: - apiGroups: [""] resources: ["pods"] verbs: ["get","watch","list"]`                                                                                                                |
+| **RoleBinding / ClusterRoleBinding** | Gán Role/ClusterRole cho user/serviceaccount       | `yaml apiVersion: rbac.authorization.k8s.io/v1 kind: RoleBinding metadata: name: read-pods-binding subjects: - kind: User name: alice namespace: default roleRef: kind: Role name: pod-reader apiGroup: rbac.authorization.k8s.io`                                              |
+| **CustomResourceDefinition (CRD)**   | Tạo resource riêng ngoài K8s mặc định              | `yaml apiVersion: apiextensions.k8s.io/v1 kind: CustomResourceDefinition metadata: name: crontabs.stable.example.com spec: group: stable.example.com versions: - name: v1 served: true storage: true scope: Namespaced names: plural: crontabs singular: crontab kind: CronTab` |
+
+
+💡 Ghi chú nhanh:
+
+Workload resources → chạy ứng dụng: Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob
+
+Config/Secrets → cấu hình ứng dụng: ConfigMap, Secret, PVC, PV
+
+Networking → kết nối pod: Service, Ingress, NetworkPolicy
+
+Quản lý quyền → Role, ClusterRole, RoleBinding, ClusterRoleBinding
+
+Quản lý cluster → Namespace, CRD
