@@ -1,9 +1,7 @@
-name: 🚀 Build & Push Docker Image to Docker Hub
+name: 🚀 Build & Push Docker Image to Docker Hub (Manual)
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # chỉ chạy khi dev bấm "Run workflow" thủ công
 
 jobs:
   build:
