@@ -27,7 +27,7 @@ jobs:
         with:
           context: ./flask-k8s-demo
           push: true
-          tags: thoang/flask-k8s-demo:latest
+          tags: thobaby/flask-k8s-demo:latest
 
       - name: ✅ Done
         run: echo "🎉 Docker image pushed to Docker Hub successfully!"
