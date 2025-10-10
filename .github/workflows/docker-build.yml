@@ -25,7 +25,7 @@ jobs:
       - name: 🏗️ Build and Push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./flask-k8s-demo
           push: true
           tags: thoang/flask-k8s-demo:latest
 
