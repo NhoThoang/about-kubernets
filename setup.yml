@@ -115,6 +115,7 @@ Trên mỗi worker node, chạy lệnh join mà master đã in ra, ví dụ:
 sudo kubeadm join 192.168.0.100:6443 --token abcdef.0123456789abcdef \
     --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxx
 
+nhở open port 6443 trên master nhé 
 
 Nếu bạn quên token, có thể tạo lại trên master:
 

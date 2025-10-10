@@ -1,0 +1,30 @@
+master
+| Thành phần                              | Port            | Giao thức | Mục đích                                               |
+| --------------------------------------- | --------------- | --------- | ------------------------------------------------------ |
+| kube-apiserver                          | **6443**        | TCP       | API server cho `kubectl`, `kubelet`, và `kubeadm join` |
+| etcd                                    | **2379–2380**   | TCP       | Giao tiếp nội bộ giữa các node etcd                    |
+| kube-scheduler                          | **10251**       | TCP       | Lịch trình pod (chỉ nội bộ)                            |
+| kube-controller-manager                 | **10252**       | TCP       | Điều khiển tài nguyên (chỉ nội bộ)                     |
+| NodePort/Ingress (nếu chạy trên master) | **30000–32767** | TCP       | Dải port NodePort, nếu master cũng chạy workload       |
+| (tùy chọn) Nginx Ingress Controller     | **80, 443**     | TCP       | Dịch vụ web (HTTP/HTTPS) từ bên ngoài                  |
+
+⚙️ Trên Worker Node
+| Thành phần                                      | Port                                       | Giao thức | Mục đích                                   |
+| ----------------------------------------------- | ------------------------------------------ | --------- | ------------------------------------------ |
+| Kubelet                                         | **10250**                                  | TCP       | API cho kubelet, do master gọi             |
+| NodePort                                        | **30000–32767**                            | TCP       | Service NodePort (expose service ra ngoài) |
+| Flannel/Calico (CNI plugin)                     | **4789/UDP**, **179/TCP**, hoặc tuỳ plugin | UDP/TCP   | Trao đổi mạng giữa các pod                 |
+| Container runtime (containerd/docker)           | **varies (thường là socket nội bộ)**       | —         | Không cần mở ngoài                         |
+| Nginx Ingress Controller (nếu chạy trên worker) | **80, 443**                                | TCP       | Lưu lượng vào từ Internet qua ingress      |
+
+
+Thường Ingress Controller sẽ được deploy như 1 Pod/Deployment trong namespace ingress-nginx, ví dụ:
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+kubectl get svc -n ingress-nginx
+
+
+| Loại node         | Cần mở                                               | Mục đích            |
+| ----------------- | ---------------------------------------------------- | ------------------- |
+| **Master**        | 6443, 2379–2380, 10250–10252, 30000–32767            | API + control-plane |
+| **Worker**        | 10250, 30000–32767, 4789/179 (CNI), 80,443 (Ingress) | Chạy workload       |
+| **Giữa các node** | TCP/UDP full trong subnet                            | Kết nối nội bộ      |
